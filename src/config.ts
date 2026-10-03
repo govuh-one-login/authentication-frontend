@@ -84,7 +84,28 @@ export function getAnalyticsCookieDomain(): string {
 }
 
 export function getAccountDomain(): string {
-  return getServiceDomain() === "localhost" ? "localhost" : ".account.gov.uk";
+  const serviceDomain = getServiceDomain().toLowerCase();
+  if (serviceDomain === "localhost") {
+    return "localhost";
+  }
+
+  const accountDomain = process.env.ACCOUNT_COOKIE_DOMAIN?.trim().toLowerCase().replace(/^\./, "");
+  const isUhSubdomain = (domain: string): boolean =>
+    /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(domain) &&
+    domain.endsWith(".gov.uhrblx.com");
+
+  if (
+    !accountDomain ||
+    !isUhSubdomain(serviceDomain) ||
+    !isUhSubdomain(accountDomain) ||
+    !(serviceDomain === accountDomain || serviceDomain.endsWith(`.${accountDomain}`))
+  ) {
+    throw new Error(
+      "Configure ACCOUNT_COOKIE_DOMAIN as an explicit GOV.UH account domain containing SERVICE_DOMAIN"
+    );
+  }
+
+  return `.${accountDomain}`;
 }
 
 export function getServiceDomain(): string {
@@ -103,7 +124,31 @@ export function getSmartAgentWebformId(): string {
 }
 
 export function getServiceSignInLink(): string {
-  return process.env.SERVICE_SIGN_IN_LINK || "https://www.gov.uk/sign-in";
+  const link = process.env.SERVICE_SIGN_IN_LINK;
+  if (!link) {
+    throw new Error("SERVICE_SIGN_IN_LINK must be configured for GOV.UH");
+  }
+
+  let url: URL;
+  try {
+    url = new URL(link);
+  } catch {
+    throw new Error("SERVICE_SIGN_IN_LINK must be a valid absolute GOV.UH URL");
+  }
+
+  if (
+    url.protocol !== "https:" ||
+    !(
+      url.hostname === "gov.uhrblx.com" ||
+      url.hostname.endsWith(".gov.uhrblx.com")
+    ) ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error("SERVICE_SIGN_IN_LINK must use HTTPS on a GOV.UH host");
+  }
+
+  return link;
 }
 
 export function getCodeRequestBlockDurationInMinutes(): number {
