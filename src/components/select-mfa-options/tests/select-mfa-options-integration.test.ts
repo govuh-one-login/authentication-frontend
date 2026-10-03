@@ -58,8 +58,10 @@ describe("Integration::select-mfa-options", () => {
     app = undefined;
   });
 
-  it("should return get security codes page", async () => {
-    await request(app).get(PATH_NAMES.GET_SECURITY_CODES).expect(200);
+  it("should show the authenticator setup page without an SMS option", async () => {
+    const response = await request(app).get(PATH_NAMES.GET_SECURITY_CODES).expect(200);
+    expect(response.text).to.contain("Set up an authenticator app");
+    expect(response.text).not.to.contain("Text message to a UK mobile phone number");
   });
 
   it("should return error when csrf not present", async () => {
@@ -84,7 +86,7 @@ describe("Integration::select-mfa-options", () => {
       .expect(function (res) {
         const $ = cheerio.load(res.text);
         expect($("#mfaOptions-error").text()).to.contains(
-          "Select how you want to get security codes"
+          "Continue with an authenticator app"
         );
       })
       .expect(400);
@@ -103,7 +105,7 @@ describe("Integration::select-mfa-options", () => {
       .expect(302);
   });
 
-  it("should redirect to /enter-phone-number page when mfaOptions is SMS", async () => {
+  it("should reject an SMS submission without entering a phone-number journey", async () => {
     await request(app)
       .post(PATH_NAMES.GET_SECURITY_CODES)
       .type("form")
@@ -112,7 +114,12 @@ describe("Integration::select-mfa-options", () => {
         _csrf: token,
         mfaOptions: "SMS",
       })
-      .expect("Location", PATH_NAMES.CREATE_ACCOUNT_ENTER_PHONE_NUMBER)
-      .expect(302);
+      .expect(function (res) {
+        const $ = cheerio.load(res.text);
+        expect($("#mfaOptions-error").text()).to.contains(
+          "Continue with an authenticator app"
+        );
+      })
+      .expect(400);
   });
 });
