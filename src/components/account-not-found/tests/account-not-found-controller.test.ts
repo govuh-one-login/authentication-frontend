@@ -142,20 +142,29 @@ describe("account not found controller", () => {
       expect(fakeService.sendNotification).to.have.been.calledOnce;
     });
 
-    it("should redirect to GOV.UK service sign-in page when One Login service", async () => {
+    it("should redirect to the configured GOV.UH service page when One Login service", async () => {
       const fakeService: SendNotificationServiceInterface = {
         sendNotification: sinon.fake.returns({
           success: true,
         }),
       } as unknown as SendNotificationServiceInterface;
+      const previousLink = process.env.SERVICE_SIGN_IN_LINK;
+      const serviceLink = "https://www.gov.uhrblx.com/services/";
+      process.env.SERVICE_SIGN_IN_LINK = serviceLink;
       req.body.optionSelected = "sign-in-to-a-service";
 
-      await accountNotFoundPost(fakeService)(req, res);
+      try {
+        await accountNotFoundPost(fakeService)(req, res);
 
-      expect(res.redirect).to.have.been.calledWith(
-        "https://www.gov.uk/sign-in"
-      );
-      expect(fakeService.sendNotification).to.have.not.been.called;
+        expect(res.redirect).to.have.been.calledWith(serviceLink);
+        expect(fakeService.sendNotification).to.have.not.been.called;
+      } finally {
+        if (previousLink === undefined) {
+          delete process.env.SERVICE_SIGN_IN_LINK;
+        } else {
+          process.env.SERVICE_SIGN_IN_LINK = previousLink;
+        }
+      }
     });
   });
 });

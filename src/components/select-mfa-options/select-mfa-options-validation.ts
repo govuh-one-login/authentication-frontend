@@ -6,7 +6,7 @@ import { isAccountRecoveryJourney } from "../../utils/request.js";
 export function validateMultiFactorAuthenticationRequest(): ValidationChainFunc {
   return [
     body("mfaOptions")
-      .notEmpty()
+      .equals("AUTH_APP")
       .withMessage((value, { req }) => {
         return req.t("pages.getSecurityCodes.secondFactorRadios.errorMessage", {
           value,

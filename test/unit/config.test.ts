@@ -17,6 +17,7 @@ import {
   getDefaultChannel,
   showTestBanner,
   getAccountDomain,
+  getServiceSignInLink,
   getPasskeyPromptClientAllowList,
   getPasskeyPromptClientDenyList,
   getPasskeyRolloutPercentage,
@@ -42,6 +43,8 @@ describe("config", () => {
     delete process.env.DEFAULT_CHANNEL;
     delete process.env.APP_ENV;
     delete process.env.SERVICE_DOMAIN;
+    delete process.env.ACCOUNT_COOKIE_DOMAIN;
+    delete process.env.SERVICE_SIGN_IN_LINK;
     delete process.env.PASSKEY_PROMPT_CLIENT_ALLOW_LIST;
     delete process.env.PASSKEY_PROMPT_CLIENT_DENY_LIST;
   });
@@ -173,25 +176,64 @@ describe("config", () => {
     });
   });
 
-  describe("getGoogleAnalyticsAndDynatraceCookieDomain", () => {
-    it("should return 'localhost' when SERVICE_DOMAIN is 'localhost'", () => {
+  describe("getAccountDomain", () => {
+    it("uses localhost for local development", () => {
       process.env.SERVICE_DOMAIN = "localhost";
       expect(getAccountDomain()).to.equal("localhost");
     });
 
-    it("should return 'localhost' when SERVICE_DOMAIN is not set", () => {
+    it("uses localhost if SERVICE_DOMAIN is absent", () => {
       delete process.env.SERVICE_DOMAIN;
       expect(getAccountDomain()).to.equal("localhost");
     });
 
-    ["signin.account.gov.uk", "auth.account.gov.uk"].forEach(
-      (serviceDomain) => {
-        it(`should return '.account.gov.uk' when SERVICE_DOMAIN is not localhost ('${serviceDomain}')`, () => {
-          process.env.SERVICE_DOMAIN = serviceDomain;
-          expect(getAccountDomain()).to.equal(".account.gov.uk");
-        });
-      }
-    );
+    it("uses only the explicitly configured UH parent cookie domain", () => {
+      process.env.SERVICE_DOMAIN = "sign-in.account.gov.uhrblx.com";
+      process.env.ACCOUNT_COOKIE_DOMAIN = ".account.gov.uhrblx.com";
+      expect(getAccountDomain()).to.equal(".account.gov.uhrblx.com");
+    });
+
+    it("does not default to an original UK account cookie domain", () => {
+      process.env.SERVICE_DOMAIN = "sign-in.account.gov.uhrblx.com";
+      expect(() => getAccountDomain()).to.throw("ACCOUNT_COOKIE_DOMAIN");
+    });
+
+    it("rejects domains outside GOV.UH", () => {
+      process.env.SERVICE_DOMAIN = "signin.account.gov.uk";
+      process.env.ACCOUNT_COOKIE_DOMAIN = "account.gov.uk";
+      expect(() => getAccountDomain()).to.throw("ACCOUNT_COOKIE_DOMAIN");
+    });
+
+    it("rejects a UH cookie domain that is not a parent of the service", () => {
+      process.env.SERVICE_DOMAIN = "sign-in.account.gov.uhrblx.com";
+      process.env.ACCOUNT_COOKIE_DOMAIN = "other.gov.uhrblx.com";
+      expect(() => getAccountDomain()).to.throw("ACCOUNT_COOKIE_DOMAIN");
+    });
+
+    it("rejects setting cookies across the entire GOV.UH site", () => {
+      process.env.SERVICE_DOMAIN = "sign-in.account.gov.uhrblx.com";
+      process.env.ACCOUNT_COOKIE_DOMAIN = "gov.uhrblx.com";
+      expect(() => getAccountDomain()).to.throw("ACCOUNT_COOKIE_DOMAIN");
+    });
+  });
+
+  describe("getServiceSignInLink", () => {
+    it("accepts a configured HTTPS GOV.UH service link", () => {
+      process.env.SERVICE_SIGN_IN_LINK = "https://www.gov.uhrblx.com/services/";
+      expect(getServiceSignInLink()).to.equal("https://www.gov.uhrblx.com/services/");
+    });
+
+    it("fails closed instead of linking to the original UK government", () => {
+      delete process.env.SERVICE_SIGN_IN_LINK;
+      expect(() => getServiceSignInLink()).to.throw("SERVICE_SIGN_IN_LINK");
+    });
+
+    ["https://www.gov.uk/sign-in", "https://gov.uhrblx.com.attacker.example/", "http://www.gov.uhrblx.com/sign-in/", "not-a-url"].forEach((link) => {
+      it(`rejects an invalid or unauthorised destination: ${link}`, () => {
+        process.env.SERVICE_SIGN_IN_LINK = link;
+        expect(() => getServiceSignInLink()).to.throw("SERVICE_SIGN_IN_LINK");
+      });
+    });
   });
 
   describe("getPasskeyPromptClientAllowList", () => {
