@@ -32,14 +32,14 @@ describe("select-mfa-options controller", () => {
   });
 
   describe("getSecurityCodesPost", async () => {
-    it("should redirect to /enter-phone-number when text message selected", async () => {
+    it("should reject a submitted SMS option without entering the phone-number journey", async () => {
       req.body.mfaOptions = "SMS";
 
       await getSecurityCodesPost(req as Request, res as Response);
 
-      expect(res.redirect).to.have.calledWith(
-        PATH_NAMES.CREATE_ACCOUNT_ENTER_PHONE_NUMBER
-      );
+      expect(res.status).to.have.been.calledWith(400);
+      expect(res.redirect).not.to.have.been.called;
+      expect(req.session.user).not.to.have.property("selectedMfaOption");
     });
 
     it("should redirect to /setup-authenticator-app even when auth app selected", async () => {
@@ -53,7 +53,7 @@ describe("select-mfa-options controller", () => {
     });
 
     describe("setting selectedMfaOption in the session", () => {
-      [MFA_METHOD_TYPE.SMS, MFA_METHOD_TYPE.AUTH_APP].forEach((i) => {
+      [MFA_METHOD_TYPE.AUTH_APP].forEach((i) => {
         it(`req.session.user.selectedMfaOption should be set when req.body.mfaOptions is ${i}`, async () => {
           req.body.mfaOptions = i;
 
@@ -68,6 +68,8 @@ describe("select-mfa-options controller", () => {
         await getSecurityCodesPost(req as Request, res as Response);
 
         expect(req.session.user).not.to.have.property("selectedMfaOption");
+        expect(res.status).to.have.been.calledWith(400);
+        expect(res.redirect).not.to.have.been.called;
       });
     });
   });
